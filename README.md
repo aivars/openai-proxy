@@ -51,4 +51,18 @@ Set these in your Vercel dashboard:
 Check Vercel's function logs if you encounter issues. Common problems:
 - Missing environment variables
 - Incorrect hash generation
-- OpenAI API key issues 
+- OpenAI API key issues
+
+## Contributing
+
+This proxy server was built for the SwiftUI AI Wrapper project. Feel free to fork, modify, and improve it for your own projects!
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Acknowledgments
+
+- Built for use with [SwiftUI AI Wrapper](https://github.com/aivars/AIWrapper)
+- Inspired by the need for secure, cost-effective OpenAI API proxying
+- Uses Vercel's excellent serverless platform 
