@@ -36,13 +36,25 @@ export default async function handler(req, res) {
     }
 
     // Convert to OpenAI format
-    const openAIMessages = parsedMessages.map(msg => ({
-      role: msg.role === 'system' ? 'assistant' : msg.role,
-      content: msg.image ? [
-        { type: 'text', text: msg.message || '' },
-        { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${msg.image}` } }
-      ] : msg.message
-    }));
+    const openAIMessages = parsedMessages.map(msg => {
+      if (msg.image) {
+        // Handle image messages
+        const imageData = msg.image.startsWith('data:') ? msg.image : `data:image/jpeg;base64,${msg.image}`;
+        return {
+          role: msg.role === 'system' ? 'assistant' : msg.role,
+          content: [
+            { type: 'text', text: msg.message || 'What is this?' },
+            { type: 'image_url', image_url: { url: imageData } }
+          ]
+        };
+      } else {
+        // Handle text-only messages
+        return {
+          role: msg.role === 'system' ? 'assistant' : msg.role,
+          content: msg.message
+        };
+      }
+    });
 
     // Call OpenAI API
     const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
