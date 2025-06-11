@@ -18,12 +18,24 @@ export default async function handler(req, res) {
     const SHARED_SECRET = process.env.SHARED_SECRET || 'your_secure_secret_key_here';
     
     // Verify the hash
+    const hashInput = messages + SHARED_SECRET;
     const expectedHash = crypto
       .createHash('md5')
-      .update(messages + SHARED_SECRET)
+      .update(hashInput)
       .digest('hex');
     
+    // DEBUG LOGGING
+    console.log('=== SERVER HASH VERIFICATION ===');
+    console.log('Received messages length:', messages.length);
+    console.log('Received hash:', hash);
+    console.log('Shared secret:', SHARED_SECRET);
+    console.log('Hash input length:', hashInput.length);
+    console.log('Expected hash:', expectedHash);
+    console.log('Hash match:', hash === expectedHash);
+    console.log('================================');
+    
     if (hash !== expectedHash) {
+      console.log('HASH MISMATCH - Authentication failed');
       return res.status(401).json({ error: 'Invalid authentication' });
     }
 
