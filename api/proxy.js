@@ -50,8 +50,30 @@ export default async function handler(req, res) {
     // Convert to OpenAI format
     const openAIMessages = parsedMessages.map(msg => {
       if (msg.image) {
-        // Handle image messages
-        const imageData = msg.image.startsWith('data:') ? msg.image : `data:image/jpeg;base64,${msg.image}`;
+        // Handle image messages - decode percent-encoded data
+        let imageData;
+        if (msg.image.startsWith('data:')) {
+          imageData = msg.image;
+        } else {
+          // Handle percent-encoded image data from iOS
+          try {
+            // Decode percent-encoded string back to binary data
+            const binaryString = msg.image.replace(/%([0-9A-F]{2})/g, (match, hex) => {
+              return String.fromCharCode(parseInt(hex, 16));
+            });
+            
+            // Convert binary string to base64
+            const base64Data = Buffer.from(binaryString, 'binary').toString('base64');
+            imageData = `data:image/jpeg;base64,${base64Data}`;
+          } catch(error) {
+            console.error('Error decoding image:', error);
+            // Fallback - try treating as already base64
+            imageData = `data:image/jpeg;base64,${msg.image}`;
+          }
+        }
+        
+        console.log('Processing image message, data URL length:', imageData.length);
+        
         return {
           role: msg.role === 'system' ? 'assistant' : msg.role,
           content: [
