@@ -176,10 +176,22 @@ module.exports = async function handler(req, res) {
     // Handle both old format (direct secret) and new format (dynamic secret with timestamp)
     let expectedSecret;
     let isLegacyAuth = false;
+    let extractedTimestamp = timestamp;
     
-    if (timestamp && shared_secret.includes('_')) {
+    // Check if timestamp is embedded in the shared_secret (new format)
+    if (!timestamp && shared_secret.includes('_')) {
+      const parts = shared_secret.split('_');
+      const lastPart = parts[parts.length - 1];
+      // Check if last part is a valid timestamp (10 digits)
+      if (/^\d{10}$/.test(lastPart)) {
+        extractedTimestamp = lastPart;
+        console.log(`==> Extracted timestamp from secret: ${extractedTimestamp}`);
+      }
+    }
+    
+    if (extractedTimestamp && shared_secret.includes('_')) {
       // New dynamic authentication format
-      const requestTimestamp = parseInt(timestamp);
+      const requestTimestamp = parseInt(extractedTimestamp);
       const currentTimestamp = Math.floor(Date.now() / 1000);
       
       // Check if timestamp is within acceptable range (5 minutes)
@@ -189,11 +201,13 @@ module.exports = async function handler(req, res) {
         return res.status(401).json({ error: 'Request timestamp expired' });
       }
       
-      expectedSecret = `${baseSecret}_${timestamp}`;
+      expectedSecret = `${baseSecret}_${extractedTimestamp}`;
+      console.log(`==> Using dynamic auth with timestamp: ${extractedTimestamp}`);
     } else {
       // Legacy authentication (direct secret comparison)
       expectedSecret = baseSecret;
       isLegacyAuth = true;
+      console.log(`==> Using legacy auth`);
     }
     
     // Timing-safe comparison to prevent timing attacks
