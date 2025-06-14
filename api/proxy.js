@@ -21,6 +21,7 @@ module.exports = async function handler(req, res) {
 
   try {
     let messages, hash, shared_secret;
+    let bodyData = ''; // Declare outside the if block
     
     // Handle different content types
     const contentType = req.headers['content-type'] || '';
@@ -31,8 +32,6 @@ module.exports = async function handler(req, res) {
       shared_secret = req.headers['x-shared-secret'];
       
       // Get raw body data from available sources
-      let bodyData = '';
-      
       if (req.body) {
         bodyData = Buffer.isBuffer(req.body) ? req.body.toString() : String(req.body);
       } else if (req.rawBody) {
