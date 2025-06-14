@@ -35,59 +35,34 @@ module.exports = async function handler(req, res) {
 
   try {
     let messages, hash, shared_secret;
-    let bodyData = ''; // Declare outside the if block
     
     // Handle different content types
     const contentType = req.headers['content-type'] || '';
     
-    if (contentType.includes('multipart/form-data')) {
-      // For multipart form data, get from headers
-      hash = req.headers['x-hash'];
-      shared_secret = req.headers['x-shared-secret'];
-      
-      // Try to get raw body data from multiple sources
-      if (req.body) {
-        bodyData = Buffer.isBuffer(req.body) ? req.body.toString() : String(req.body);
-      } else if (req.rawBody) {
-        bodyData = Buffer.isBuffer(req.rawBody) ? req.rawBody.toString() : String(req.rawBody);
-      } else {
-        // Try to read from request stream
-        try {
-          bodyData = await getRawBody(req);
-        } catch (e) {
-          console.log('Failed to read raw body:', e.message);
-        }
-      }
-      
-      // Extract messages from multipart form data
-      if (bodyData) {
-        // Look for: name="messages"...Content-Type: text/plain...[content]
-        const messagesMatch = bodyData.match(/name="messages"[^]*?Content-Type:\s*text\/plain[^]*?\r?\n\r?\n([^]*?)(?:\r?\n--[^]*?(?:--)?$|\r?\n--[^]*?\r?\n)/);
-        if (messagesMatch && messagesMatch[1]) {
-          messages = messagesMatch[1].trim();
-        }
-        
-        // If that doesn't work, try a simpler pattern
-        if (!messages) {
-          const simpleMatch = bodyData.match(/name="messages"[^]*?\r?\n\r?\n([^]*?)(?:\r?\n--)/);
-          if (simpleMatch && simpleMatch[1]) {
-            messages = simpleMatch[1].trim();
-          }
-        }
-        
-        // Even simpler fallback
-        if (!messages) {
-          const basicMatch = bodyData.match(/name="messages"[^]*?\n\n([^]*?)(?:\n--)/);
-          if (basicMatch && basicMatch[1]) {
-            messages = basicMatch[1].trim();
-          }
-        }
-      }
-    } else {
-      // For JSON data
+    if (contentType.includes('application/json')) {
+      // Handle JSON requests (new simplified approach)
       messages = req.body?.messages;
-      hash = req.body?.hash;
-      shared_secret = req.body?.shared_secret;
+      hash = req.body?.hash || req.headers['x-hash'];
+      shared_secret = req.body?.shared_secret || req.headers['x-shared-secret'];
+      
+      console.log('==> JSON request received');
+      console.log('==> Messages length:', messages ? messages.length : 0);
+      console.log('==> Has hash:', !!hash);
+      console.log('==> Has shared_secret:', !!shared_secret);
+      
+    } else if (contentType.includes('application/x-www-form-urlencoded')) {
+      // Handle form-encoded requests (legacy support)
+      messages = req.body?.messages;
+      hash = req.body?.hash || req.headers['x-hash'];
+      shared_secret = req.body?.shared_secret || req.headers['x-shared-secret'];
+      
+      console.log('==> Form-encoded request received');
+      
+    } else {
+      return res.status(400).json({ 
+        error: 'Unsupported content type',
+        contentType: contentType
+      });
     }
     
     // Validate required fields
@@ -99,15 +74,7 @@ module.exports = async function handler(req, res) {
           hasHash: !!hash,
           hasSharedSecret: !!shared_secret,
           contentType: contentType,
-          bodyType: typeof req.body,
-          rawBodyType: typeof req.rawBody,
-          bodyLength: req.body ? String(req.body).length : 0,
-          rawBodyLength: req.rawBody ? String(req.rawBody).length : 0,
-          messagesPreview: messages ? messages.substring(0, 100) + '...' : 'null',
-          bodyDataLength: bodyData ? bodyData.length : 0,
-          bodyDataPreview: bodyData ? bodyData.substring(0, 200) + '...' : 'null',
-          hasReadableStream: req.readable,
-          requestComplete: req.complete
+          messagesLength: messages ? messages.length : 0
         }
       });
     }
@@ -173,10 +140,11 @@ module.exports = async function handler(req, res) {
     const openaiRequest = {
       model: 'gpt-4o', // Use latest vision model
       messages: convertedMessages,
-      max_tokens: 4000
+      max_tokens: 4000,
+      temperature: 0.7
     };
 
-    console.log('Sending to OpenAI:', JSON.stringify(openaiRequest, null, 2));
+    console.log('==> Sending to OpenAI with', convertedMessages.length, 'messages');
 
     // Call OpenAI API
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -199,6 +167,8 @@ module.exports = async function handler(req, res) {
 
     const openaiData = await openaiResponse.json();
     
+    console.log('==> OpenAI response received, length:', openaiData.choices[0].message.content.length);
+    
     // Return response in format expected by iOS app
     return res.status(200).json({
       choices: [{
@@ -215,4 +185,4 @@ module.exports = async function handler(req, res) {
       details: error.message
     });
   }
-} 
+}; 
