@@ -1,15 +1,31 @@
 {
   "name": "openai-proxy",
   "version": "1.0.0",
-  "description": "OpenAI proxy server for SwiftUI AI Wrapper",
+  "description": "OpenAI Proxy Server for SwiftUI AI Wrapper with Vision API support",
   "main": "api/proxy.js",
-  "type": "module",
   "scripts": {
     "dev": "vercel dev",
-    "deploy": "vercel"
+    "build": "vercel build",
+    "deploy": "vercel --prod"
   },
-  "dependencies": {},
-  "devDependencies": {
-    "vercel": "^32.0.0"
-  }
+  "dependencies": {
+    "crypto": "^1.0.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aivars/openai-proxy.git"
+  },
+  "keywords": [
+    "openai",
+    "proxy",
+    "vision",
+    "api",
+    "vercel",
+    "swiftui"
+  ],
+  "author": "Aivars Meijers",
+  "license": "MIT"
 } 

@@ -1,26 +1,34 @@
-import crypto from 'crypto';
+// Updated OpenAI Proxy Server for SwiftUI AI Wrapper
+// Handles both old format (image: "base64") and new OpenAI Vision API format
+// Created by Aivars Meijers on 14/06/2025
 
 export default async function handler(req, res) {
-  // Only allow POST requests
+  // Set CORS headers
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-hash, x-shared-secret');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    const { messages, hash } = req.body;
+    const { messages, hash, shared_secret } = req.body;
     
-    // Validate required fields
-    if (!messages || !hash) {
-      return res.status(400).json({ error: 'Missing required fields' });
+    // Validate authentication
+    const expectedSecret = process.env.SHARED_SECRET;
+    if (!expectedSecret || shared_secret !== expectedSecret) {
+      return res.status(401).json({ error: 'Invalid authentication' });
     }
 
-    // Your shared secret key (change this to something secure)
-    const SHARED_SECRET = process.env.SHARED_SECRET || 'your_secure_secret_key_here';
-    
-    // Verify the hash
-    const expectedHash = crypto
+    // Validate hash
+    const expectedHash = require('crypto')
       .createHash('md5')
-      .update(messages + SHARED_SECRET)
+      .update(messages + expectedSecret)
       .digest('hex');
     
     if (hash !== expectedHash) {
@@ -35,79 +43,83 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Invalid messages format' });
     }
 
-    // Convert to OpenAI format
-    const openAIMessages = parsedMessages.map(msg => {
-      if (msg.image) {
-        // Handle image messages - decode percent-encoded data
-        let imageData;
-        if (msg.image.startsWith('data:')) {
-          imageData = msg.image;
-        } else {
-          // Handle percent-encoded image data from iOS
-          try {
-            // Decode percent-encoded string back to binary data
-            const binaryString = msg.image.replace(/%([0-9A-F]{2})/g, (match, hex) => {
-              return String.fromCharCode(parseInt(hex, 16));
-            });
-            
-            // Convert binary string to base64
-            const base64Data = Buffer.from(binaryString, 'binary').toString('base64');
-            imageData = `data:image/jpeg;base64,${base64Data}`;
-          } catch(error) {
-            console.error('Error decoding image:', error);
-            // Fallback - try treating as already base64
-            imageData = `data:image/jpeg;base64,${msg.image}`;
-          }
-        }
-        
-
-        
+    // Convert old format to new OpenAI Vision API format
+    const convertedMessages = parsedMessages.map(message => {
+      // If message has old format with separate image field
+      if (message.image && message.message) {
         return {
-          role: msg.role === 'system' ? 'assistant' : msg.role,
+          role: message.role || 'user',
           content: [
-            { type: 'text', text: msg.message || 'What is this?' },
-            { type: 'image_url', image_url: { url: imageData } }
+            {
+              type: 'text',
+              text: message.message
+            },
+            {
+              type: 'image_url',
+              image_url: {
+                url: `data:image/jpeg;base64,${message.image}`
+              }
+            }
           ]
         };
-      } else {
-        // Handle text-only messages
-        return {
-          role: msg.role === 'system' ? 'assistant' : msg.role,
-          content: msg.message
-        };
       }
+      
+      // If message already has content array (new format)
+      if (message.content && Array.isArray(message.content)) {
+        return message;
+      }
+      
+      // Regular text message
+      return {
+        role: message.role || 'user',
+        content: message.message || message.content || ''
+      };
     });
+
+    // Prepare OpenAI request
+    const openaiRequest = {
+      model: 'gpt-4o', // Use latest vision model
+      messages: convertedMessages,
+      max_tokens: 1000
+    };
+
+    console.log('Sending to OpenAI:', JSON.stringify(openaiRequest, null, 2));
 
     // Call OpenAI API
-    const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+    const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
       },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini', // Cost-effective model
-        messages: openAIMessages,
-        max_tokens: 1000,
-        temperature: 0.7,
-      }),
+      body: JSON.stringify(openaiRequest)
     });
 
-    if (!openAIResponse.ok) {
-      const error = await openAIResponse.text();
-      console.error('OpenAI API Error:', error);
-      return res.status(500).json({ error: 'OpenAI API request failed' });
+    if (!openaiResponse.ok) {
+      const errorData = await openaiResponse.text();
+      console.error('OpenAI API error:', errorData);
+      return res.status(openaiResponse.status).json({ 
+        error: 'OpenAI API request failed',
+        details: errorData
+      });
     }
 
-    const data = await openAIResponse.json();
-    const reply = data.choices[0]?.message?.content || 'No response generated';
-
-    // Return the response as plain text (matching the original PHP proxy)
-    res.setHeader('Content-Type', 'text/plain');
-    res.status(200).send(reply);
+    const openaiData = await openaiResponse.json();
+    
+    // Return response in format expected by iOS app
+    return res.status(200).json({
+      choices: [{
+        message: {
+          content: openaiData.choices[0].message.content
+        }
+      }]
+    });
 
   } catch (error) {
-    console.error('Proxy Error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Proxy error:', error);
+    return res.status(500).json({ 
+      error: 'Internal server error',
+      details: error.message
+    });
   }
 } 
