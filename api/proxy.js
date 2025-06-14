@@ -27,17 +27,27 @@ module.exports = async function handler(req, res) {
     
     if (contentType.includes('multipart/form-data')) {
       // For multipart form data, get from headers and body
-      messages = req.body?.messages;
       hash = req.headers['x-hash'];
       shared_secret = req.headers['x-shared-secret'];
       
-      // If not in body, try to parse from raw body
-      if (!messages && req.body) {
-        // Try to extract from form data
-        const bodyStr = req.body.toString();
-        const messagesMatch = bodyStr.match(/name="messages"[^]*?Content-Type: text\/plain[^]*?\r?\n\r?\n([^]*?)\r?\n--/);
-        if (messagesMatch) {
-          messages = messagesMatch[1];
+      // Parse multipart body to extract messages
+      if (req.body) {
+        // Convert body to string if it's a buffer
+        const bodyStr = Buffer.isBuffer(req.body) ? req.body.toString() : String(req.body);
+        
+        // Extract messages from multipart form data
+        // Look for: name="messages"...Content-Type: text/plain...[content]
+        const messagesMatch = bodyStr.match(/name="messages"[^]*?Content-Type:\s*text\/plain[^]*?\r?\n\r?\n([^]*?)(?:\r?\n--[^]*?(?:--)?$|\r?\n--[^]*?\r?\n)/);
+        if (messagesMatch && messagesMatch[1]) {
+          messages = messagesMatch[1].trim();
+        }
+        
+        // If that doesn't work, try a simpler pattern
+        if (!messages) {
+          const simpleMatch = bodyStr.match(/name="messages"[^]*?\r?\n\r?\n([^]*?)(?:\r?\n--)/);
+          if (simpleMatch && simpleMatch[1]) {
+            messages = simpleMatch[1].trim();
+          }
         }
       }
     } else {
@@ -56,7 +66,9 @@ module.exports = async function handler(req, res) {
           hasHash: !!hash,
           hasSharedSecret: !!shared_secret,
           contentType: contentType,
-          headers: Object.keys(req.headers)
+          bodyType: typeof req.body,
+          bodyLength: req.body ? String(req.body).length : 0,
+          messagesPreview: messages ? messages.substring(0, 100) + '...' : 'null'
         }
       });
     }
