@@ -5,6 +5,20 @@
 
 const crypto = require('crypto');
 
+// Helper function to get raw body from request
+async function getRawBody(req) {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    req.on('data', chunk => {
+      body += chunk.toString();
+    });
+    req.on('end', () => {
+      resolve(body);
+    });
+    req.on('error', reject);
+  });
+}
+
 module.exports = async function handler(req, res) {
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -31,11 +45,18 @@ module.exports = async function handler(req, res) {
       hash = req.headers['x-hash'];
       shared_secret = req.headers['x-shared-secret'];
       
-      // Get raw body data from available sources
+      // Try to get raw body data from multiple sources
       if (req.body) {
         bodyData = Buffer.isBuffer(req.body) ? req.body.toString() : String(req.body);
       } else if (req.rawBody) {
         bodyData = Buffer.isBuffer(req.rawBody) ? req.rawBody.toString() : String(req.rawBody);
+      } else {
+        // Try to read from request stream
+        try {
+          bodyData = await getRawBody(req);
+        } catch (e) {
+          console.log('Failed to read raw body:', e.message);
+        }
       }
       
       // Extract messages from multipart form data
@@ -84,7 +105,9 @@ module.exports = async function handler(req, res) {
           rawBodyLength: req.rawBody ? String(req.rawBody).length : 0,
           messagesPreview: messages ? messages.substring(0, 100) + '...' : 'null',
           bodyDataLength: bodyData ? bodyData.length : 0,
-          bodyDataPreview: bodyData ? bodyData.substring(0, 200) + '...' : 'null'
+          bodyDataPreview: bodyData ? bodyData.substring(0, 200) + '...' : 'null',
+          hasReadableStream: req.readable,
+          requestComplete: req.complete
         }
       });
     }
