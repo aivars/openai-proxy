@@ -20,7 +20,46 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    const { messages, hash, shared_secret } = req.body;
+    let messages, hash, shared_secret;
+    
+    // Handle different content types
+    const contentType = req.headers['content-type'] || '';
+    
+    if (contentType.includes('multipart/form-data')) {
+      // For multipart form data, get from headers and body
+      messages = req.body?.messages;
+      hash = req.headers['x-hash'];
+      shared_secret = req.headers['x-shared-secret'];
+      
+      // If not in body, try to parse from raw body
+      if (!messages && req.body) {
+        // Try to extract from form data
+        const bodyStr = req.body.toString();
+        const messagesMatch = bodyStr.match(/name="messages"[^]*?Content-Type: text\/plain[^]*?\r?\n\r?\n([^]*?)\r?\n--/);
+        if (messagesMatch) {
+          messages = messagesMatch[1];
+        }
+      }
+    } else {
+      // For JSON data
+      messages = req.body?.messages;
+      hash = req.body?.hash;
+      shared_secret = req.body?.shared_secret;
+    }
+    
+    // Validate required fields
+    if (!messages || !hash || !shared_secret) {
+      return res.status(400).json({ 
+        error: 'Missing required fields',
+        debug: {
+          hasMessages: !!messages,
+          hasHash: !!hash,
+          hasSharedSecret: !!shared_secret,
+          contentType: contentType,
+          headers: Object.keys(req.headers)
+        }
+      });
+    }
     
     // Validate authentication
     const expectedSecret = process.env.SHARED_SECRET;
