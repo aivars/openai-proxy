@@ -9,12 +9,12 @@ const crypto = require('crypto');
 // In production, use Redis or similar for distributed rate limiting
 const rateLimitStore = new Map();
 const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
-const RATE_LIMIT_MAX_REQUESTS = 10; // Max 10 requests per minute per IP
-const RATE_LIMIT_MAX_TOKENS = 50000; // Max 50k tokens per minute per IP
+const RATE_LIMIT_MAX_REQUESTS = 20; // Max 20 requests per minute per IP (increased for image analysis)
+const RATE_LIMIT_MAX_TOKENS = 100000; // Max 100k tokens per minute per IP
 
 // Request size limits
-const MAX_REQUEST_SIZE = 10 * 1024 * 1024; // 10MB max request size
-const MAX_MESSAGE_LENGTH = 100000; // Max message length
+const MAX_REQUEST_SIZE = 20 * 1024 * 1024; // 20MB max request size (increased for images)
+const MAX_MESSAGE_LENGTH = 500000; // Max 500k characters (increased for base64 images)
 
 // Helper function to get client IP
 function getClientIP(req) {
