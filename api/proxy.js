@@ -1,6 +1,7 @@
 // Updated OpenAI Proxy Server for SwiftUI AI Wrapper
 // Handles both old format (image: "base64") and new OpenAI Vision API format
 // Created by Aivars Meijers on 14/06/2025
+// Fixed for Vercel deployment compatibility
 
 const crypto = require('crypto');
 
