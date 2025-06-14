@@ -173,7 +173,7 @@ module.exports = async function handler(req, res) {
     const openaiRequest = {
       model: 'gpt-4o', // Use latest vision model
       messages: convertedMessages,
-      max_tokens: 1000
+      max_tokens: 4000
     };
 
     console.log('Sending to OpenAI:', JSON.stringify(openaiRequest, null, 2));
