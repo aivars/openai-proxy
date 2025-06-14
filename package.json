@@ -3,16 +3,8 @@
   "version": "1.0.0",
   "description": "OpenAI Proxy Server for SwiftUI AI Wrapper with Vision API support",
   "main": "api/proxy.js",
-  "scripts": {
-    "dev": "vercel dev",
-    "build": "vercel build",
-    "deploy": "vercel --prod"
-  },
-  "dependencies": {
-    "crypto": "^1.0.1"
-  },
   "engines": {
-    "node": ">=18.0.0"
+    "node": "18.x"
   },
   "repository": {
     "type": "git",
